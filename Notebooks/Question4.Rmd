@@ -1,0 +1,210 @@
+---
+title: "ITBDA4-14 Assignment 2 - Question 4"
+output: html_notebook
+---
+## Question 4.1: Web scraping and data extraction
+
+### Use case: Analysing book prices and ratings
+This use case investigates the prices and ratings of books listed on
+Books to Scrape. Book details are extracted from the website and
+organised into an R data frame. The data will then be cleaned and
+exported for analysis in PostgreSQL.
+
+Books to Scrape is a demonstration website designed for scraping
+practice. Its prices and ratings are simulated, so the results
+describe this demonstration dataset rather than real book prices
+or reader reviews.
+
+```{r}
+# Install packages 
+packages <- c("rvest", "dplyr", "stringr")
+
+for (package in packages) {
+  if (!requireNamespace(package, quietly = TRUE)) {
+    install.packages(package)
+  }
+}
+
+# Load the packages
+library(rvest)
+library(dplyr)
+library(stringr)
+```
+
+```{r}
+catalogue_url <- "https://books.toscrape.com/"
+catalogue_page <- read_html(catalogue_url)
+
+# Select each book listing on the page
+book_listings <- catalogue_page |>
+  html_elements("article.product_pod")
+
+# Extract raw information from each listing
+raw_books <- data.frame(
+  title = book_listings |>
+    html_element("h3 a") |>
+    html_attr("title"),
+
+  price_raw = book_listings |>
+    html_element(".price_color") |>
+    html_text(),
+
+  rating_raw = book_listings |>
+    html_element("p.star-rating") |>
+    html_attr("class"),
+
+  availability_raw = book_listings |>
+    html_element(".availability") |>
+    html_text(),
+
+  stringsAsFactors = FALSE
+)
+
+# Check the number of records and inspect raw data
+nrow(raw_books)
+raw_books
+```
+```{r}
+# Shows the first five records and all four columns
+print(head(raw_books, 5))
+
+# Count missing values in each column
+colSums(is.na(raw_books))
+
+# Check for blank values in each column
+colSums(sapply(raw_books, function(column) {
+  is.na(column) | trimws(column) == ""
+}))
+```
+```{r}
+# I'm extracting the price from the text so I can analyse it as a number
+raw_books$price_numeric <- as.numeric(
+  str_extract(raw_books$price_raw, "[0-9]+\\.[0-9]+")
+)
+
+# I'm finding the rating word inside each book's HTML class
+raw_books$rating_word <- str_extract(
+  raw_books$rating_raw,
+  "One|Two|Three|Four|Five"
+)
+
+# I'm converting the rating words into numbers from 1 to 5
+rating_values <- c(
+  One = 1,
+  Two = 2,
+  Three = 3,
+  Four = 4,
+  Five = 5
+)
+
+raw_books$rating_numeric <- unname(
+  rating_values[raw_books$rating_word]
+)
+
+# I'm checking the original values alongside the extracted values
+print(head(raw_books[, c(
+  "title",
+  "price_raw",
+  "price_numeric",
+  "rating_raw",
+  "rating_numeric"
+)], 5))
+```
+## Regex extraction
+Regular expressions were used to extract the numerical price and the rating word from each book listing. The price was converted from text containing a pound symbol into a numeric value, while the rating word was converted into a number between one and five. The original values were retained so that they could be compared with the extracted values.
+
+
+## Question 4.2: Data cleaning and export
+The scraped book data was cleaned to prepare it for database analysis.
+This included removing unnecessary whitespace, checking for duplicate
+records and examining missing or invalid values.
+
+```{r}
+# I'm creating a separate data frame for the cleaned book data
+clean_books <- data.frame(
+  title = str_squish(raw_books$title),
+  price_gbp = raw_books$price_numeric,
+  rating = raw_books$rating_numeric,
+  availability = str_squish(raw_books$availability_raw),
+  stringsAsFactors = FALSE
+)
+
+# I'm checking for duplicate records before removing them
+duplicate_count <- sum(duplicated(clean_books))
+cat("Number of duplicate records:", duplicate_count, "\n")
+
+# I'm removing exact duplicate rows if there are any
+clean_books <- distinct(clean_books)
+
+# I'm checking for missing values in the cleaned columns
+colSums(is.na(clean_books))
+
+# I'm checking that prices and ratings are within sensible ranges
+cat("Invalid prices:", sum(clean_books$price_gbp <= 0, na.rm = TRUE), "\n")
+cat("Invalid ratings:", sum(!clean_books$rating %in% 1:5 &
+                              !is.na(clean_books$rating)), "\n")
+
+# I'm previewing the cleaned records
+head(clean_books)
+```
+```{r}
+# I'm checking the quality of the cleaned dataset
+cat("Number of cleaned records:", nrow(clean_books), "\n")
+cat("Duplicate records found:", duplicate_count, "\n\n")
+
+cat("Missing values in each column:\n")
+print(colSums(is.na(clean_books)))
+
+cat("\nInvalid prices:",
+    sum(clean_books$price_gbp <= 0, na.rm = TRUE), "\n")
+
+cat("Invalid ratings:",
+    sum(!clean_books$rating %in% 1:5 & !is.na(clean_books$rating)),
+    "\n")
+```
+```{r}
+# I'm making a separate copy to demonstrate missing-value imputation
+imputation_demo <- clean_books
+
+# I'm deliberately hiding one price for this demonstration
+imputation_demo$price_gbp[1] <- NA
+
+# I'm calculating the median from the remaining available prices
+median_price <- median(imputation_demo$price_gbp, na.rm = TRUE)
+
+# I'm replacing the missing price with the median
+imputation_demo$price_gbp[is.na(imputation_demo$price_gbp)] <- median_price
+
+# I'm comparing the original price with the imputed estimate
+data.frame(
+  book = clean_books$title[1],
+  original_price = clean_books$price_gbp[1],
+  imputed_price = imputation_demo$price_gbp[1]
+)
+```
+### Missing-value imputation
+No missing values were found in the cleaned scraped dataset. To
+demonstrate an appropriate imputation technique, a separate copy of
+the data was created and one price was deliberately set to missing.
+The missing price was replaced with the median of the remaining
+prices. This was a demonstration only; the original cleaned dataset
+retained its observed prices for export and analysis.
+
+```{r}
+# I'm exporting the cleaned book data for PostgreSQL
+write.csv(
+  clean_books,
+  file = "clean_books.csv",
+  row.names = FALSE,
+  fileEncoding = "UTF-8"
+)
+
+# I'm checking where the CSV was saved
+normalizePath("clean_books.csv")
+```
+
+### Exporting the cleaned data
+The cleaned dataset was exported as a CSV file for import into
+PostgreSQL. It contains the observed prices and ratings from the
+scraped records. The imputation demonstration was performed separately
+and did not alter the exported data.

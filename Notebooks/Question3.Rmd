@@ -1,0 +1,364 @@
+---
+title: "ITBDA4-14 Assignment 2 - Question 3"
+output: html_notebook
+---
+
+# Question 3: Web Text Mining
+
+## Question 3.1: Web scraping and text extraction
+
+```{r}
+# Had to install packages as they weren't installed
+packages <- c("rvest", "httr", "robotstxt")
+
+for (package in packages) {
+  if (!requireNamespace(package, quietly = TRUE)) {
+    install.packages(package)
+  }
+}
+```
+
+```{r}
+# Load the packages
+library(rvest)
+library(httr)
+library(robotstxt)
+```
+
+```{r}
+# My chosen website is Books to Scrape, a website designed for
+# practising web scraping.
+
+website_url <- "https://books.toscrape.com/"
+
+# I selected the book "Join" for the text analysis 
+book_url <- paste0(
+  website_url,
+  "/catalogue/join_902/index.html"
+)
+
+# Check whether the website's robots.txt rules allow access
+# to the selected page.
+scraping_allowed <- paths_allowed(book_url)
+
+# Display the result of the access check
+scraping_allowed
+```
+Books to Scrape was selected because it is a demonstration website designed for practising web scraping. The robots.txt check returned TRUE, but also reported that the file was not found, so the result was not treated as confirmation of an explicit robots.txt permission. The demonstration requests one selected book page.
+
+```{r}
+# Read the selected book page
+book_page <- read_html(book_url)
+
+# Extract the book title
+book_title <- book_page |>
+  html_element("h1") |>
+  html_text2()
+
+# Extract the paragraph after the product-description heading
+book_description <- book_page |>
+  html_element("#product_description + p") |>
+  html_text2()
+
+# Store the extracted details in a data frame
+book_data <- data.frame(
+  title = book_title,
+  content = book_description,
+  source_url = book_url,
+  stringsAsFactors = FALSE
+)
+
+# Check the extracted title and description
+book_data
+```
+```{r}
+# Check that the description was extracted
+cat(book_data$content)
+```
+## Explanation: 
+The extracted book title and description were stored in an R data frame named book_data. The data frame contains one row representing the selected webpage, with columns for the title, extracted content and source URL.
+
+
+## Question 3.2: Textual data preprocessing
+```{r}
+# Install tm
+if (!requireNamespace("tm", quietly = TRUE)) {
+  install.packages("tm")
+}
+
+library(tm)
+
+```
+```{r}
+# Keep the original extracted text unchanged
+original_text <- book_data$content
+
+# Remove the duplicated opening.
+starts <- gregexpr("What if you could live multiple lives",
+                   original_text, fixed = TRUE)[[1]]
+
+if (length(starts) >= 2 && starts[2] > 0) {
+  cleaned_text <- substring(original_text, starts[2])
+} else {
+  cleaned_text <- original_text
+}
+
+# Add a space where sentence-ending punctuation is followed
+# immediately by a capital letter, e.g. "horrors.Jolted"
+cleaned_text <- gsub(
+  "([.!?])([A-Z])",
+  "\\1 \\2",
+  cleaned_text,
+  perl = TRUE
+)
+
+# Remove the website's trailing
+cleaned_text <- sub("\\s*\\.\\.\\.more\\s*$", "", cleaned_text)
+
+# Remove extra whitespace
+cleaned_text <- trimws(gsub("\\s+", " ", cleaned_text))
+
+# Save the cleaned text alongside the original
+book_data$cleaned_content <- cleaned_text
+
+# Inspect the cleaned text
+cat(book_data$cleaned_content)
+```
+
+```{r}
+# Start with the readable cleaned description
+analysis_text <- cleaned_text 
+
+# Convert the text to lowercase 
+analysis_text <- tolower(analysis_text)
+
+# Replace punctuation and numbers with spaces 
+analysis_text <- gsub("[[:punct:][:digit:]]+", " ", analysis_text)
+
+# Split the text into individual words 
+words <- unlist(strsplit(analysis_text, "\\s+"))
+
+# Remove empty entries and common English stopwords 
+words <- words[
+  words != "" &
+  !words %in% stopwords("english")
+]
+
+# Create a frequency table for the remaining words 
+word_frequencies <- sort(table(words), decreasing = TRUE)
+
+# Display the most common words
+head(word_frequencies, 15)
+```
+### Explanation of text preprocessing
+The extracted book description was cleaned to prepare it for analysis.
+The repeated opening was removed, missing spaces between sentences were
+corrected, and the trailing website marker was removed. Extra whitespace
+was also removed.
+
+A separate version was converted to lowercase and split into individual
+words. Punctuation, numbers, empty entries and common English stopwords
+were removed before calculating word frequencies. The readable cleaned
+description was retained for sentence-based summarisation.
+
+
+
+## Question 3.3: Text summarisation and visualisation
+```{r}
+# Install stringr 
+if (!requireNamespace("stringr", quietly = TRUE)) {
+  install.packages("stringr")
+}
+library(stringr)
+```
+```{r}
+# Split the readable description into sentences 
+sentences <- str_split(
+  cleaned_text,
+  "(?<=[.!?])\\s+"
+)[[1]]
+
+# Remove empty sentences
+sentences <- sentences[nzchar(trimws(sentences))]
+# Display the number of sentences available
+length(sentences)
+```
+```{r}
+# Score each sentence using the frequencies of the meaningful words
+sentence_scores <- sapply(sentences, function(sentence) {
+
+  # Apply the same basic cleaning 
+  sentence <- tolower(sentence)
+  sentence <- gsub("[[:punct:][:digit:]]+", " ", sentence)
+
+  sentence_words <- unlist(strsplit(sentence, "\\s+"))
+
+  # Keep words that appear in the frequency table
+  sentence_words <- sentence_words[
+    sentence_words %in% names(word_frequencies)
+  ]
+
+  if (length(sentence_words) == 0) {
+    return(0)
+  }
+
+  # Average the word frequencies to reduce preference for long sentences
+  mean(as.numeric(word_frequencies[sentence_words]))
+})
+
+# Select the three highest-scoring sentences
+n_summary <- min(3, length(sentences))
+
+selected_sentences <- order(
+  sentence_scores,
+  decreasing = TRUE
+)[seq_len(n_summary)]
+
+# Restore their original order 
+selected_sentences <- sort(selected_sentences)
+
+# Display the frequency-based summary
+cat(
+  paste(sentences[selected_sentences], collapse = " ")
+)
+```
+```{r}
+# Install textrank
+if (!requireNamespace("textrank", quietly = TRUE)) {
+  install.packages("textrank")
+}
+
+library(textrank)
+```
+```{r}
+# Create a data frame with an ID for each sentence
+sentence_data <- data.frame(
+  textrank_id = seq_along(sentences),
+  sentence = sentences,
+  stringsAsFactors = FALSE
+)
+
+# Prepare words for each sentence
+sentence_tokens <- lapply(seq_along(sentences), function(i) {
+
+  # Convert to lowercase and remove punctuation and numbers
+  text <- tolower(sentences[i])
+  text <- gsub("[[:punct:][:digit:]]+", " ", text)
+
+  # Split into words and remove common English stopwords
+  tokens <- unlist(strsplit(text, "\\s+"))
+  tokens <- tokens[tokens != "" & !tokens %in% tm::stopwords("english")]
+
+  data.frame(
+    textrank_id = rep(i, length(tokens)),
+    term = tokens,
+    stringsAsFactors = FALSE
+  )
+})
+
+# Combine the words from all sentences into one table
+terminology <- do.call(rbind, sentence_tokens)
+
+# Rank sentences using TextRank
+textrank_result <- textrank_sentences(
+  data = sentence_data,
+  terminology = terminology
+)
+
+# Show the top three sentences in their original order
+textrank_summary <- summary(
+  textrank_result,
+  n = 3,
+  keep.sentence.order = TRUE
+)
+
+textrank_summary
+```
+### Comparison of the summarisation techniques
+
+Both the frequency-based method and TextRank selected the same three
+sentences. The frequency-based method ranked sentences according to the
+average frequency of their meaningful words, whereas TextRank ranked
+sentences according to their connections with other sentences based on
+shared words.
+
+The selected sentences describe the Join technology, Chance and Lucky's
+search for a cure, and their encounter with the creators of a new form
+of consciousness. Because the source description is short, the results
+are exploratory. The summary also begins with “That’s the promise”,
+which refers to an omitted sentence; this illustrates how extractive
+summaries can lose context.
+
+
+```{r}
+# Install ggplot2 if needed
+if (!requireNamespace("ggplot2", quietly = TRUE)) {
+  install.packages("ggplot2")
+}
+
+library(ggplot2)
+
+# Convert the 10 most frequent words into a data frame
+top_words <- as.data.frame(head(word_frequencies, 10))
+colnames(top_words) <- c("word", "frequency")
+
+# Create a labelled bar chart
+ggplot(top_words, aes(x = reorder(word, frequency), y = frequency)) +
+  geom_col(fill = "#E85D9E") +
+  geom_text(aes(label = frequency), hjust = -0.2, size = 3.5) +
+  coord_flip() +
+  scale_y_continuous(
+    expand = expansion(mult = c(0, 0.15))
+  ) +
+  labs(
+    title = "Most frequent words in the book description",
+    subtitle = "After text preprocessing and stopword removal",
+    x = "Word",
+    y = "Frequency (number of occurrences)",
+    caption = "Source: Books to Scrape"
+  ) +
+  theme_minimal()
+```
+## Findings: Word frequency
+The pink bar chart above presents the ten most frequent words in the book description after text preprocessing and stopword removal. The words “technology”, “join” and “human” each appear three times, making them the most frequent words in the cleaned text. The words “consciousness”, “chance” and “lucky” each appear twice.
+
+The results suggest that the description focuses on technology and human consciousness, as well as the experience of the two main characters. The book description is relatively short, so the frequencies are low and should be interpreted in the context of this single text.
+
+```{r}
+library(wordcloud)
+
+
+set.seed(123)
+
+# Reserve space above and below the word cloud
+par(mar = c(4, 1, 5, 1))
+
+wordcloud(
+  words = names(word_frequencies),
+  freq = as.numeric(word_frequencies),
+  max.words = 30,
+  min.freq = 1,
+  random.order = FALSE,
+  colors = c("#E754A3", "#A65DD8", "#20A6A1"),
+  scale = c(3, 0.7)
+)
+
+title(
+  main = "Most frequent words in the book description",
+  line = 2,
+  cex.main = 1.2
+)
+
+mtext(
+  "Word size represents frequency",
+  side = 1,
+  line = 2,
+  cex = 0.9
+)
+```
+## Findings: Word Cloud 
+The above word cloud presents the most frequent words in the cleaned description of Join. Larger words appear more frequently in the text. The words “human”, “technology”, and “join” are among the largest, while “consciousness”, “chance” and “lucky” are also visible.
+
+These words highlight the descriptions focus on technology, human consciousness and experiences of the two main characters. The word cloud complements the bar chart by providing a visual overview of the vocabulary, while the bar chart shows the exact frequencies. Both visualisations are based on the same short book description. 
+
+

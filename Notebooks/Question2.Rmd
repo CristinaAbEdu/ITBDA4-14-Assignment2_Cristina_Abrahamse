@@ -1,0 +1,259 @@
+---
+title: "ITBDA4-14 Assignment 2 - Question 2"
+output: html_notebook
+---
+## Question 2.1: Loading and preparing the news documents
+
+```{r}
+# Find the text files within the sa_news folder
+news_files <- list.files(
+  path = "sa_news",
+  pattern = "\\.txt$",
+  full.names = TRUE
+)
+
+# Create one row per file, containing the name and full text
+news_data <- data.frame(
+  file_name = basename(news_files),
+  content = vapply(
+    news_files,
+    function(file){
+      paste(readLines(file, warn = FALSE, encoding = "UTF-8"),
+            collapse = " ")
+    },
+    character(1)
+  ),
+  stringAsFactors = FALSE
+)
+
+# Check to see how many documents were loaded 
+nrow(news_data)
+
+# View file names and beginning of each article 
+data.frame(
+  file_name = news_data$file_name,
+  content_preview = substr(news_data$content, 1, 100)
+)
+```
+```{r}
+if (!requireNamespace("tm", quietly = TRUE)) {
+  install.packages("tm")
+}
+```
+```{r}
+# Load the package
+library(tm)
+```
+
+```{r}
+# Creates text corpus form the article content 
+news_corpus <- VCorpus(VectorSource(news_data$content))
+
+# Clean & standardise text 
+news_corpus <- tm_map(news_corpus, content_transformer(tolower))
+news_corpus <- tm_map(news_corpus, removePunctuation)
+news_corpus <- tm_map(news_corpus, removeNumbers)
+news_corpus <- tm_map(news_corpus, removeWords, stopwords("english"))
+news_corpus <- tm_map(news_corpus, stripWhitespace)
+
+# Add cleaned text to data frame
+news_data$cleaned_content <- vapply(
+  news_corpus,
+  as.character,
+  character(1)
+)
+
+# Compare original and cleaned text for first article 
+data.frame(
+  version = c("Original", "Cleaned"),
+  preview = c(
+    substr(news_data$content[1], 1, 250),
+    substr(news_data$cleaned_content[1], 1, 250)
+  )
+)
+```
+### Explanation of the preprocessing
+The ten news articles were loaded into a data frame, with one row per
+document. Each row contains the file name and its corresponding content.
+The text was then converted to lowercase, and punctuation, numbers,
+common English stopwords and extra whitespace were removed. The original
+content was retained alongside the cleaned text for comparison and
+subsequent topic modelling.
+
+
+## Question 2.2: Latent Dirichlet Allocation (LDA)
+```{r}
+# Install topicmodels if it is not already installed
+if (!requireNamespace("topicmodels", quietly = TRUE)) {
+  install.packages("topicmodels")
+}
+```
+```{r}
+# Load the package
+library(topicmodels)
+```
+```{r}
+# Create a document-term matrix from the cleaned corpus
+dtm <- DocumentTermMatrix(news_corpus)
+
+# Use the file names as document identifiers
+rownames(dtm) <- news_data$file_name
+
+# Check the number of documents and terms
+dim(dtm)
+
+# Check that every document contains words
+rowSums(as.matrix(dtm))
+```
+A document-term matrix was created from the preprocessed articles using word counts. An LDA model was then fitted using Gibbs sampling. Three topics were selected as an exploratory starting point, and the ten most probable words were reported for each topic. A fixed random seed was then used to support reproducibility.
+
+```{r}
+# Set number of topics 
+n_topics <- 3
+
+# Fit LDA model 
+lda_model <- LDA(
+  dtm,
+  k = n_topics,
+  method = "Gibbs",
+  control = list(seed = 1234)
+)
+
+# Display top 10 words for each topic
+top_words <- terms(lda_model, 10)
+top_words
+```
+```{r}
+# Obtain the topic-word probabilities from the fitted LDA model
+topic_word_probabilities <- posterior(lda_model)$terms
+
+# Create a table of the top 10 words and their probabilities
+top_word_distribution <- do.call(
+  rbind,
+  lapply(seq_len(n_topics), function(topic) {
+    probabilities <- topic_word_probabilities[topic, ]
+
+    # Select the 10 words with the highest probabilities
+    top_indices <- order(probabilities, decreasing = TRUE)[1:10]
+
+    data.frame(
+      topic = paste("Topic", topic),
+      word = names(probabilities)[top_indices],
+      probability = probabilities[top_indices],
+      row.names = NULL
+    )
+  })
+)
+
+# Display the results
+top_word_distribution
+```
+### Interpretation of the LDA results
+The LDA model was fitted using three topics, and the ten words with the
+highest estimated probabilities were displayed for each topic. Topic 1
+includes terms such as “department”, “police”, “cold” and “weather”,
+suggesting a mixture of public safety and weather-related content.
+Topic 2 includes “public”, “service”, “invoices” and “departments”,
+suggesting a possible focus on public services and administration.
+Topic 3 includes “government”, “coalition”, “eskom” and “power”,
+suggesting a possible focus on government and electricity-related news.
+
+The probabilities indicate how likely each word is within its topic,
+rather than its raw frequency. Since only the top ten words are shown,
+their probabilities do not sum to one. These topic labels are tentative:
+the collection contains only ten articles, and some topics contain
+words associated with more than one theme.
+
+
+
+## Question 2.3: Visualisation of topic keywords
+
+```{r}
+# Install ggplot2 if needed
+if (!requireNamespace("ggplot2", quietly = TRUE)) {
+  install.packages("ggplot2")
+}
+
+library(ggplot2)
+
+```
+
+```{r}
+# Plot the top words and their probabilities for each topic 
+ggplot(
+  top_word_distribution,
+  aes(x = reorder(word, probability), y = probability, fill = topic)
+) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  facet_wrap(~ topic, scales = "free_y") +
+  labs(
+    title = "Top 10 words in each LDA topic",
+    x = "Word",
+    y = "Probability within topic"
+  ) +
+  theme_minimal()
+```
+```{r}
+# Install the wordcloud package 
+if (!requireNamespace("wordcloud", quietly = TRUE)) {
+  install.packages("wordcloud")
+}
+```
+
+```{r}
+
+library(wordcloud)
+
+# Keep the word placement reproducible
+set.seed(1234)
+
+# I chose pink, purple and teal for the top keywords found 
+topic_colours <- c(
+  "Topic 1" = "#E85D9E",  # Pink
+  "Topic 2" = "#9B6ACB",  # Purple
+  "Topic 3" = "#2AA6A1"   # Teal
+)
+
+# Create one word cloud per topic
+for (topic_name in unique(top_word_distribution$topic)) {
+
+  # Select the top words for the current topic
+  topic_data <- subset(
+    top_word_distribution,
+    topic == topic_name
+  )
+
+  # Give the cloud some space around its edges
+  par(mar = c(1, 1, 3, 1))
+
+  wordcloud(
+    words = topic_data$word,
+    freq = topic_data$probability,
+    scale = c(3, 1),
+    min.freq = 0,
+    random.order = FALSE,
+    rot.per = 0.15,
+    colors = topic_colours[topic_name]
+  )
+
+  title(
+    main = paste("Top keywords:", topic_name),
+    col.main = topic_colours[topic_name],
+    font.main = 2
+  )
+}
+```
+### Interpretation of the visualisations
+
+The bar charts compare the estimated probabilities of the ten most
+likely words within each topic. This makes it possible to identify and
+compare the most prominent terms in each topic.
+
+The word clouds present the same topic keywords visually. Larger words
+have higher estimated probabilities within their respective topics.
+Together, the two visualisations provide numerical and visual views of
+the words associated with each topic.
+
+```
+
