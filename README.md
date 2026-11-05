@@ -1,43 +1,52 @@
 # ITBDA4-14: Big Data Analytics — Project 2
 
-This repository contains the code, notebooks, datasets and documentation
-for Questions 1–4 of the project.
+This repository contains the project documentation, code, notebooks
+and datasets for Questions 1–4.
 
-## How to navigate this repository
+## Question 1: Hadoop MapReduce
 
-### Question 1: Hadoop MapReduce
+Open the **Question_1_Hadoop_MapReduce** folder for the Java source code,
+test documents and demonstration outputs. Start with
+`KeywordSearch.java` to review the mapper, reducer and configuration.
+The folder's README explains the supporting files.
 
-Open the **Question_1_Hadoop_MapReduce** folder to find the Java source
-code, input documents and demonstration outputs. Start with
-`KeywordSearch.java` to review the implementation. The folder's README
-explains the supporting files.
+The project documentation PDF contains the Question 1.1 diagram and
+explanation, as well as the demonstration evidence.
 
-The project Word document contains the Question 1.1 logical layout
-diagram, explanations and demonstration evidence.
+## Question 2: News topic modelling
 
-### Question 2: Topic modelling
+Open the **Notebooks** folder and select the Question 2 R notebook.
+It contains the news preprocessing, LDA topic modelling and
+visualisations. The **sa_news** folder contains its input documents.
 
-Open the **Notebooks** folder and select the Question 2 R Notebook.
-It contains the news article preprocessing, LDA topic modelling,
-results and visualisations. The news dataset is in the **Datasets** folder.
+## Question 3: Web text summarisation
 
-### Question 3: Web text analysis
+Open the **Notebooks** folder and select the Question 3 R notebook.
+It contains the extraction, preprocessing and summarisation of text
+from Books to Scrape. The project documentation PDF includes the
+visualisations and findings.
 
-Open the **Notebooks** folder and select the Question 3 R Notebook.
-It contains the web text extraction, preprocessing and summarisation.
-The project Word document includes the visualisations and findings.
+## Question 4: Web scraping and PostgreSQL
 
-### Question 4: ETL and PostgreSQL
+Open the **Notebooks** folder for the Question 4 R notebook,
+`clean_books.csv` and `Question4_queries.sql`. The notebook documents
+the scraping and cleaning process. The SQL file contains the two
+PostgreSQL investigations.
 
-Open the **Notebooks** folder to find the Question 4 R Notebook and
-the SQL queries file. The notebook documents web scraping and data
-cleaning; the SQL file contains the PostgreSQL investigations.
+The project documentation PDF includes screenshots of the SQL results
+and their interpretations.
 
-The cleaned CSV is in the **Datasets** folder. The project Word document
-contains screenshots of the SQL results and their interpretations.
+## Running the project
+
+Download the repository files to your computer to run the code.
+Questions 2–4 require R and the packages used in the notebooks.
+Question 1 requires Java and Hadoop. The Question 4 SQL queries
+require PostgreSQL and the cleaned CSV imported into a table.
+
+The **sa_news** folder should remain alongside the Question 2 notebook
+so that its relative file path can locate the news documents.
 
 ## Project documentation
 
-The project Word document contains the written documentation, selected
-screenshots, explanations and reference list. A PDF version is also
-provided for submission.
+The PDF on the repository's main page contains the project
+documentation, selected screenshots, explanations and references.
