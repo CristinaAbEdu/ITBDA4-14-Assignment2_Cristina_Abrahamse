@@ -1,7 +1,8 @@
 # Question 1: Hadoop MapReduce Keyword Search
 
-This folder contains the Java project and supporting files for the
-Hadoop MapReduce keyword search.
+The logical layout diagram and explanation for Question 1.1 are included
+in the project Word document. This folder contains the Java project and
+supporting files for the Hadoop MapReduce keyword search.
 
 ## Where to start
 
@@ -21,5 +22,5 @@ name, row and column of each match.
   the `part-r-00000` file within an output folder to view its results.
 - **.class files**: Compiled Java classes generated from the source code.
 
-The project documentation contains the logical layout diagram,
-explanation and demonstration evidence for Question 1.
+The project Word document also contains the explanation and
+demonstration evidence for Question 1.
