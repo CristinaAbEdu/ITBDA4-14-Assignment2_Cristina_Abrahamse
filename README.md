@@ -26,15 +26,26 @@ It contains the extraction, preprocessing and summarisation of text
 from Books to Scrape. The project documentation PDF includes the
 visualisations and findings.
 
-## Question 4: Web scraping and PostgreSQL
+### Running the PostgreSQL queries
 
-Open the **Notebooks** folder for the Question 4 R notebook,
-`clean_books.csv` and `Question4_queries.sql`. The notebook documents
-the scraping and cleaning process. The SQL file contains the two
-PostgreSQL investigations.
+To reproduce the Question 4.3 results:
 
-The project documentation PDF includes screenshots of the SQL results
-and their interpretations.
+1. Open PostgreSQL using pgAdmin and connect to a database.
+2. Use the Query Tool to create a table:
+
+   ```sql
+   CREATE TABLE clean_books (
+       title TEXT,
+       price_gbp NUMERIC(10, 2),
+       rating INTEGER,
+       availability TEXT
+   );
+   ```
+
+3. Import **clean_books.csv** into the `clean_books` table using
+   pgAdmin's Import/Export Data option. Select CSV format, a comma
+   delimiter and enable the header option.
+4. Open **Question4_queries.sql** in the Query Tool and run each query.
 
 ## Running the project
 
