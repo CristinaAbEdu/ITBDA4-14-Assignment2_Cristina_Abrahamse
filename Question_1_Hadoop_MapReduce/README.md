@@ -1,12 +1,25 @@
 # Question 1: Hadoop MapReduce Keyword Search
 
-This folder contains the Java implementation of the Hadoop MapReduce
-keyword search for Question 1.
+This folder contains the Java project and supporting files for the
+Hadoop MapReduce keyword search.
 
-The program searches the provided text documents for a keyword supplied
-by the user and reports the document name and the row and column of each
-match. The search is case-insensitive.
+## Where to start
 
-The Java source file and the project datasets are included in this
-repository. The explanation, diagram and demonstration results are
-presented in the project documentation.
+Open **KeywordSearch.java** to view the Java source code. It contains
+the mapper, reducer and Hadoop job configuration for the keyword search.
+
+The program searches the input documents for a keyword supplied when
+the job is run. The search is case-insensitive and reports the document
+name, row and column of each match.
+
+## Files and folders
+
+- **KeywordSearch.java**: Java source code for the MapReduce program.
+- **KeywordSearch.jar**: Compiled program used to run the Hadoop job.
+- **map_reduce_test_docs**: Input text documents used for testing.
+- **Output folders**: Results produced by demonstration searches. Open
+  the `part-r-00000` file within an output folder to view its results.
+- **.class files**: Compiled Java classes generated from the source code.
+
+The project documentation contains the logical layout diagram,
+explanation and demonstration evidence for Question 1.
